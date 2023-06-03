@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  InstanceType:
+    Description: "Webserver EC2 instance type"
+    Type: "String" 
+    Default: t2.micro
+    AllowedValues:
+      - "t2.micro"
+      - "t3.small"
+    ConstraintDescription: must be a valid EC2 type
+  myKeyPair: 
+    Description: Amazon EC2 Key Pair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "myKey"
+Mappings:
+  AMIRegionMap:
+    "us-east-1": 
+      "AmazonLinux2": "ami-06a0cd9728546d178"
+      "Ubuntu2004LTS": "ami-007855ac798b5175e"
+    "us-west-2": 
+      "AmazonLinux2": "ami-06a0cd9728546d178"
+      "Ubuntu2004LTS": "ami-007855ac798b5175e"
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [ AMIRegionMap, "us-west-2", AmazonLinux2 ]
+      KeyName: !Ref myKeyPair
+      InstanceType: !Ref InstanceType
+      SubnetId: !ImportValue SampleNetworkCrossStack-SubnetID
+      SecurityGroupIds: 
+        - !ImportValue SampleNetworkCrossStack-SecurityGroupID
+      
+      Tags: 
+        - Key: "Name"
+          Value: "MyEC2Instance"
+        - Key: "Launched By"
+          Value: "CloudFormation"
+      UserData: 
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+
+  IPAddress:
+    Type: AWS::EC2::EIP
+  IPAssoc:
+    Type: AWS::EC2::EIPAssociation
+    Properties: 
+      InstanceId: !Ref 'MyEC2Instance'
+      EIP: !Ref 'IPAddress'
+    
+Outputs:
+  InstancePrivateIP: 
+    Description: EC2 instance private IP
+    Value: !GetAtt MyEC2Instance.PrivateIp
+  InstanceDNS:
+    Description: EC2 instance DNS name
+    Value: !GetAtt MyEC2Instance.PublicIp
+
+   
